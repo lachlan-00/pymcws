@@ -6,6 +6,8 @@ from xml.etree import ElementTree
 import datetime
 import urllib
 
+from .exceptions import UnresolvableKeyError
+
 
 URL_KEYLOOKUP = "http://webplay.jriver.com/libraryserver/lookup"
 URL_LOCAL = "http://{ip}:{port}/MCWS/v1/"
@@ -135,6 +137,10 @@ class MediaServer:
         r.raise_for_status()
 
         et = ElementTree.fromstring(r.content)
+        if (et.attrib["Status"] == "Error"):
+            logger.error("KeyID '" + self.key_id + "' could not be resolved.'")
+            raise UnresolvableKeyError(self.key_id, et.find('msg').text)
+            return None
         self.key_id = et.find('keyid').text
         self.ip = et.find('ip').text
         self.port = et.find('port').text
@@ -175,9 +181,9 @@ class MediaServer:
             params = None
         # choose authentication strategy
         if self.user is None or self.password is None:
-            r = requests.get(endpoint, params=params, timeout=1)
+            r = requests.get(endpoint, params=params, timeout=3)
         else:
-            r = requests.get(endpoint, params=params, timeout=1, auth=self.credentials())
+            r = requests.get(endpoint, params=params, timeout=3, auth=self.credentials())
         r.raise_for_status()
         self.lastConnection = datetime.datetime.now()
         return r
